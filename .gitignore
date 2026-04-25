@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Local config / secrets
+.env
+.env.local
+*.key
+secrets.json
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Build artifacts
+*.pdf
+*.epub
+*.mp3
+*.wav
+*.png
+*.jpg
+*.jpeg
+!**/SKILL.md
+!**/REFERENCE.md
+!**/README.md
