@@ -258,6 +258,35 @@ Once the GUIDE and PLAN are right, downstream pipeline runs unmodified. Investme
 ### 10. The same Russian-style cover formula reproduces cleanly via Nano Banana Pro for English-language books
 Hat + tropical setting + bold black caps title + accent-color subtitle + author name in spaced caps + "FROM THE AUTHOR OF ___" footer = consistently strong EN-market cover. (Adapt per genre — literary fiction has a different formula.)
 
+### 11. Persona breadth check — "would a non-tech reader feel excluded?"
+On the Enlightened series we drafted with the persona "burnt-out AI engineer." It produced strong voice but was too narrow: agents wrote 100 chapters thick with Slack channel names, Cursor, ChatGPT, Hacker News, n8n, hackathons, "vibe-coded," "AI Twitter," 2024-tech-layoffs. A CMO, a teacher, a lawyer in their 40s read page 5 and felt the door shut. **For mass-market self-help / pop-spirituality, the persona should be a knowledge worker / mid-career professional that any white-collar reader can project into. IT references should be FLAVORING (1-2 per chapter for authenticity), not the dominant texture.** Mitigation: after drafting, run a "voice-broaden" surgical-edit pass: replace tool-specific names with category nouns ("Slack channel called #ai-experiments" → "the shared folder of abandoned initiatives"; "I built an n8n flow" → "I automated a process"; "the Notion / Linear / Reclaim / Motion / Sunsama stack" → "the seven productivity apps I paid for"). Cheaper than re-drafting the whole book; preserves the emotional beats.
+
+### 12. fpdf2: `pdf.image()` does NOT auto page-break
+`pdf.image(..., y=pdf.get_y(), w=W)` will draw the image at current Y even if it overflows the page bottom — the bottom gets clipped. Always pre-calculate image height and force `pdf.add_page()` before drawing if it won't fit:
+```python
+img_w = 70  # mm
+with Image.open(sp) as im:
+    img_h = img_w * (im.height / im.width)
+bottom_margin = 20
+needed = 2 + img_h + 4
+if pdf.get_y() + needed > PAGE_H - bottom_margin:
+    pdf.add_page()
+pdf.image(str(sp), x=(PAGE_W - img_w) / 2, y=pdf.get_y(), w=img_w)
+pdf.set_y(pdf.get_y() + img_h + 4)
+```
+Same logic for `seeds` callout boxes — pre-estimate height, page-break if it won't fit.
+
+### 13. fpdf2: `multi_cell` indents only the first line, NOT subsequent wrapped lines
+If you call `pdf.set_x(LEFT + 12)` then `pdf.multi_cell(w=TEXT_W - 24, align="C", text=long_text)`, ONLY THE FIRST LINE is indented. Wrapped lines reset to the page's left-margin and render full-width — looks like a giant page-wide italic block instead of a centered narrow column. Symptom: pull-quotes look wider than body text. Fix: temporarily change the page margins, then restore:
+```python
+pdf.set_left_margin(LEFT + 12)
+pdf.set_right_margin(RIGHT + 12)
+pdf.set_x(LEFT + 12)
+pdf.multi_cell(w=TEXT_W - 24, h=6, text=quote, align="C")
+pdf.set_left_margin(LEFT)
+pdf.set_right_margin(RIGHT)
+```
+
 ---
 
 ## Required environment / dependencies
