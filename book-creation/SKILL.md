@@ -297,16 +297,31 @@ pdf.set_y(pdf.get_y() + img_h + 4)
 ```
 Same logic for `seeds` callout boxes — pre-estimate height, page-break if it won't fit.
 
-### 13. fpdf2: `multi_cell` indents only the first line, NOT subsequent wrapped lines
-If you call `pdf.set_x(LEFT + 12)` then `pdf.multi_cell(w=TEXT_W - 24, align="C", text=long_text)`, ONLY THE FIRST LINE is indented. Wrapped lines reset to the page's left-margin and render full-width — looks like a giant page-wide italic block instead of a centered narrow column. Symptom: pull-quotes look wider than body text. Fix: temporarily change the page margins, then restore:
+### 13. fpdf2: `multi_cell` cannot honor a sustained indent for wrapped lines
+If you want centered pull-quotes in a narrow indented column, `multi_cell(align="C")` is a trap:
+- Calling `pdf.set_x(LEFT + 12)` before it indents ONLY the first line; subsequent wrapped lines reset to left-margin.
+- Temporarily widening `set_left_margin` / `set_right_margin` ALSO doesn't reliably fix it — fpdf2 still renders wrapped lines full-page-wide. (Don't trust the first fix that "looks right" — verify positions in the output PDF.)
+
+Real fix: bypass `multi_cell` entirely and hand-wrap + render line-by-line with `cell()`:
 ```python
-pdf.set_left_margin(LEFT + 12)
-pdf.set_right_margin(RIGHT + 12)
-pdf.set_x(LEFT + 12)
-pdf.multi_cell(w=TEXT_W - 24, h=6, text=quote, align="C")
-pdf.set_left_margin(LEFT)
-pdf.set_right_margin(RIGHT)
+pdf.set_font("T", "I", 12)
+quote_w = TEXT_W - 30                      # narrow column (e.g. 88mm on A5)
+quote_x = (PAGE_W - quote_w) / 2           # centered → ~30mm indent each side
+quote_text = f'"{text}"'
+words = quote_text.split()
+lines, cur = [], words[0] if words else ""
+for w in words[1:]:
+    trial = cur + " " + w
+    if pdf.get_string_width(trial) <= quote_w: cur = trial
+    else: lines.append(cur); cur = w
+if cur: lines.append(cur)
+needed = len(lines) * 6 + 6
+if pdf.get_y() + needed > PAGE_H - 20: pdf.add_page()
+for line in lines:
+    pdf.set_x(quote_x)
+    pdf.cell(w=quote_w, h=6, text=line, align="C", new_x="LMARGIN", new_y="NEXT")
 ```
+Verification (don't trust visual scan in a viewer — extract positions): use `pypdf` with a `visitor_text` callback to assert quote-line `x` values are inside the narrow column (e.g. ~85–100pt) and NOT at body-text x (~45pt). If quotes still appear at body-x, the fix didn't take.
 
 ---
 
