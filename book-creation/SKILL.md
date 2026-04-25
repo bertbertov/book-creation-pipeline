@@ -297,7 +297,32 @@ pdf.set_y(pdf.get_y() + img_h + 4)
 ```
 Same logic for `seeds` callout boxes — pre-estimate height, page-break if it won't fit.
 
-### 13. fpdf2: `multi_cell` cannot honor a sustained indent for wrapped lines
+### 13. fpdf2: long italic strings need hand-wrap — `cell(w=0)` AND `multi_cell` both fail differently
+**The bug bites in TWO places**, not one. Check both before claiming fixed:
+
+**(a) `cell(w=0, align="C")` with a long string** = ONE page-wide line, edge-to-edge. Looks like a giant italic banner. Most common culprit: **chapter subtitle/epigraph rendered as a single italic line under the chapter title.** `cell()` does NOT wrap.
+
+**(b) `set_x(...)` then `multi_cell(narrow_w, align="C")`** = first line indented, subsequent wrapped lines reset to LEFT-margin and render full-width. Most common culprits: pull-quotes, callout boxes (e.g. SEEDS items).
+
+**Both fixes are the same pattern: hand-wrap with `get_string_width`, render line-by-line with `cell(w=narrow, align="C")` after `set_x(centered_x)`:**
+```python
+pdf.set_font("T", "I", 11)
+col_w = TEXT_W - 30                     # narrow column
+col_x = (PAGE_W - col_w) / 2            # centered
+words = text.split()
+lines, cur = [], words[0] if words else ""
+for w in words[1:]:
+    trial = cur + " " + w
+    if pdf.get_string_width(trial) <= col_w: cur = trial
+    else: lines.append(cur); cur = w
+if cur: lines.append(cur)
+for line in lines:
+    pdf.set_x(col_x)
+    pdf.cell(w=col_w, h=7, text=line, align="C", new_x="LMARGIN", new_y="NEXT")
+```
+For SEEDS-style hanging-bullet lists, same hand-wrap with bullet on first line and indent on continuation lines (use `cell(new_x="RIGHT", new_y="TOP")` to keep the bullet inline).
+
+**Verify visually, not just by x-positions.** Render the suspect pages to PNG with PyMuPDF (`fitz.open(...).get_pixmap(dpi=120).save(...)`) and READ them back. `pypdf` x-position checks alone missed this for me — they reported correct x for `cell()` blocks (subtitle started at x=44 because that's the page margin, technically "correct"), but the LINE EXTENDED to right margin. Visual render is the only reliable check.
 If you want centered pull-quotes in a narrow indented column, `multi_cell(align="C")` is a trap:
 - Calling `pdf.set_x(LEFT + 12)` before it indents ONLY the first line; subsequent wrapped lines reset to left-margin.
 - Temporarily widening `set_left_margin` / `set_right_margin` ALSO doesn't reliably fix it — fpdf2 still renders wrapped lines full-page-wide. (Don't trust the first fix that "looks right" — verify positions in the output PDF.)
