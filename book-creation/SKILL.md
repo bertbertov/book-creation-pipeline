@@ -259,7 +259,28 @@ Once the GUIDE and PLAN are right, downstream pipeline runs unmodified. Investme
 Hat + tropical setting + bold black caps title + accent-color subtitle + author name in spaced caps + "FROM THE AUTHOR OF ___" footer = consistently strong EN-market cover. (Adapt per genre — literary fiction has a different formula.)
 
 ### 11. Persona breadth check — "would a non-tech reader feel excluded?"
-On the Enlightened series we drafted with the persona "burnt-out AI engineer." It produced strong voice but was too narrow: agents wrote 100 chapters thick with Slack channel names, Cursor, ChatGPT, Hacker News, n8n, hackathons, "vibe-coded," "AI Twitter," 2024-tech-layoffs. A CMO, a teacher, a lawyer in their 40s read page 5 and felt the door shut. **For mass-market self-help / pop-spirituality, the persona should be a knowledge worker / mid-career professional that any white-collar reader can project into. IT references should be FLAVORING (1-2 per chapter for authenticity), not the dominant texture.** Mitigation: after drafting, run a "voice-broaden" surgical-edit pass: replace tool-specific names with category nouns ("Slack channel called #ai-experiments" → "the shared folder of abandoned initiatives"; "I built an n8n flow" → "I automated a process"; "the Notion / Linear / Reclaim / Motion / Sunsama stack" → "the seven productivity apps I paid for"). Cheaper than re-drafting the whole book; preserves the emotional beats.
+
+On the Enlightened series we drafted with the persona "burnt-out AI engineer." The voice was strong but too narrow: 100 chapters thick with niche tool names, jargon, and Slack-channel-namedrop. A CMO, a teacher, a lawyer in their 40s reads page 5 and feels the door shut.
+
+**For mass-market self-help / pop-spirituality**, the persona should be a knowledge worker / mid-career professional that any white-collar reader can project into.
+
+**The refined keep-vs-soften rule** (locked 2026-04-25 by Albert after voice-broaden review):
+
+| KEEP (universally known, every reader gets these) | SOFTEN (niche tools / jargon — replace with category nouns) |
+|---|---|
+| ChatGPT | Cursor → "the AI code tool" |
+| Instagram, TikTok, Twitter/X, YouTube, LinkedIn, Reddit | Hacker News → "the news feed at 1 AM" |
+| Slack, Zoom, email, calendar | n8n → "an automation I wrote" |
+| Generic "AI tools," "the new tools," "the hype" | Notion / Linear / Reclaim / Motion / Sunsama → "the seven productivity apps I paid for" |
+| Layoffs (universal anxiety) | "vibe-coded" → "winged it" / "improvised" |
+| Conferences, offsites | hackathon → "innovation week" / "internal demo day" |
+| Startups, founders, CEOs, PMs | Slack channel called "#ai-experiments" → "the project folder of abandoned initiatives" |
+| iPhone, Android, smartphone | "agent loop" → "the workflow" / "the script that ran on its own" |
+| Audible, Kindle, Substack | "shipped a feature" → "launched something" |
+
+**Mitigation if drafted too narrow:** run a **voice-broaden** surgical-edit pass. 4 parallel agents (one per book) make targeted replacements per the table above. Keep all sketches/quotes/seeds intact; preserve emotional beats; just swap niche jargon for category words. Cheaper than re-drafting from scratch.
+
+**Persona description to use in book guides:** "a senior-something at a tech-adjacent company / a knowledge worker / a mid-career professional who got swept up in the hype wave" — NOT "a software engineer who built AI agents." That single phrasing change in the SERIES_GUIDE.md cascades through every chapter the agents write.
 
 ### 12. fpdf2: `pdf.image()` does NOT auto page-break
 `pdf.image(..., y=pdf.get_y(), w=W)` will draw the image at current Y even if it overflows the page bottom — the bottom gets clipped. Always pre-calculate image height and force `pdf.add_page()` before drawing if it won't fit:
