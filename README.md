@@ -1,6 +1,8 @@
-# Claude Skills — Albert Kamalov
+# Book Creation Pipeline From Scratch
 
-A collection of [Claude Code skills](https://docs.claude.com/en/docs/claude-code/skills) for end-to-end book production: drafting, illustrating, compiling, audiobooking, and publishing.
+A collection of [Claude Code skills](https://docs.claude.com/en/docs/claude-code/skills) that take a book from a one-line concept to a published Kindle/Kobo/Google-Play listing — drafting, illustrating, compiling, audiobooking, publishing.
+
+Works for one book, or a series. Self-help, novels, manifestos, memoirs.
 
 Drop a folder into `~/.claude/skills/` (or your project's `.claude/skills/`) and the skill becomes discoverable by Claude Code.
 
