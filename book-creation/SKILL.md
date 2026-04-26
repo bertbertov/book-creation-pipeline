@@ -387,6 +387,70 @@ After fix 14, also make sure your `render_h2` calls `pdf.set_x(LEFT)` explicitly
 ### 19. Avoid heavy color blocks on covers if the brand is a "minimalist luxury" aesthetic
 Default cover instinct is to put the title in white text on a dark band at top + bottom. For a Phaidon / Penguin Modern / pravilo-global.com style brand, this looks gimmicky. Better: pure white background, type at top with a thin tan rule beneath, hero image framed in a thin rule, type below. The white space IS the brand.
 
+### 20. Interior image style MUST match the cover aesthetic of THIS book — don't carry over from a previous series
+Sketchy black-ink-on-cream interior illustrations were the *Enlightened* series signature. They are NOT a default. For every new book, choose the chapter-image style that matches THIS book's cover:
+- **Typographic cover** (e.g. *948 Business Books* black/cream/red slash) → iPhone-realistic editorial PHOTOS of single objects in soft daylight, magazine-spread aesthetic.
+- **Caricature/illustration cover** (e.g. *Self-Help Decade* 12-figure grid) → atmospheric documentary photos that evoke each chapter's world; slice-of-life, no people, real textures.
+- **Sketchy ink cover** (e.g. *Enlightened* series) → matching black-line ink illustrations on cream.
+
+The user's locked preference for non-illustrated books is **iPhone-realistic** (per `feedback_image_realism.md`). Never batch-generate 30+ images without first running ONE test image and visually confirming the style is right for THIS book.
+
+### 21. Do NOT force chapter openers onto recto (right-hand) pages with blank versos
+The traditional-book convention "if current page is even, add a blank page so the chapter opener lands on the right" produces empty pages mid-book. Users WILL flag these as bugs. Just `add_page()` per chapter — let chapters start where they fall. If a true print-shop layout is required later (for offset printing), add the recto-forcing as a CLI flag, off by default.
+
+### 22. fpdf2 `set_right_margin(distance)` takes DISTANCE FROM RIGHT EDGE, not the absolute X position of the right edge
+A nasty bug:
+```python
+LEFT = 18              # distance from left edge — correct
+RIGHT = PAGE_W - 18    # absolute x of right margin — DO NOT pass to set_right_margin
+pdf.set_left_margin(LEFT)        # OK
+pdf.set_right_margin(RIGHT)      # WRONG — sets right margin to ~134mm from the right edge
+                                 # = negative usable area
+```
+`pdf.write()` will then error with `FPDFException: Not enough horizontal space to render a single character`. The fix: pass the same constant for both:
+```python
+pdf.set_left_margin(MARGIN_MM)
+pdf.set_right_margin(MARGIN_MM)
+```
+`multi_cell(TEXT_W, ...)` will still work because it takes the width explicitly — but `write()` and other right-margin-aware calls silently break.
+
+### 23. Action blocks (the "One. Two. Three." closer) — use `pdf.write()` for inline bold + full-width wrap
+The naïve approach (render bold label via `cell(label_w)`, then body via `cell(rem_w)` per line) produces narrower-than-body, left-aligned-looking action paragraphs because all subsequent lines inherit the shortened wrap width. The user will flag this as "not full width."
+
+The clean pattern (requires fix #22 already in place):
+```python
+pdf.set_x(LEFT)
+pdf.set_font("Body", "B", 11)
+pdf.write(5.6, label + " ")    # bold "One. "
+pdf.set_font("Body", "", 11)
+pdf.write(5.6, body)            # body wraps to full text width
+pdf.ln(8)
+```
+`write()` flows from the cursor across the full text-width and wraps at the right margin. Loses justification on the action block (ragged-right) but keeps the bold lead-in and uses the full page width — the right tradeoff.
+
+### 24. Pure white pages everywhere — don't paint cream backgrounds on SOME pages
+Trap: writing an `add_cream_page()` helper that paints a cream rect on every explicit `add_page()` call, but doing nothing for the auto-flowed pages fpdf2 creates when `multi_cell` overflows. Result: inconsistent backgrounds — explicit pages cream, overflow pages white. Users will flag immediately.
+
+Either paint EVERY page (override `header()` to fill the page background) or paint NONE (let fpdf2's default white carry it). For premium book aesthetic, **none** wins — pure white throughout.
+
+### 25. Always ship a PUBLISHING_KIT.md per book — don't wait to be asked
+The book is not "done" until the publishing kit is in the folder alongside the PDF. Required sections:
+- Title block (title, subtitle, author, imprint, edition, language, page count, ISBN plan)
+- Short description (back cover, ~80 words)
+- Long description (product page, ~330 words)
+- BISAC categories (3 picks + backups)
+- Amazon keywords (7 slots, ≤50 chars each)
+- Category browse paths (Amazon, Kobo, Google Play separately)
+- Audience tiers (primary / secondary / tertiary)
+- Comparable titles (5–6, real titles for the algo)
+- Author bio (~120 words)
+- Pricing table per platform (US/UK/DE × ebook/paperback)
+- Marketing angles (15-word hook, one tweet, launch sequence, "don't market it as")
+- Production checklist with checkboxes (cover, manuscript, photos, PDF, RU translation, EPUB, audiobook, Findaway kit, ISBN, Amazon Author Central, Goodreads)
+- File map (where everything lives in the folder)
+
+A publishing kit is typically 250–400 lines of Markdown per book.
+
 ---
 
 ## Required environment / dependencies
