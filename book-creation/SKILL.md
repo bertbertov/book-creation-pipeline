@@ -348,6 +348,45 @@ for line in lines:
 ```
 Verification (don't trust visual scan in a viewer — extract positions): use `pypdf` with a `visitor_text` callback to assert quote-line `x` values are inside the narrow column (e.g. ~85–100pt) and NOT at body-text x (~45pt). If quotes still appear at body-x, the fix didn't take.
 
+### 14. fpdf2: explicitly call `set_left_margin` and `set_right_margin` to match your LEFT/RIGHT constants
+fpdf2's default left margin is **10 mm**, not your design's `LEFT` value. If you write code like:
+```python
+LEFT, RIGHT = 22, 22
+# ... later ...
+pdf.cell(0, 7, "SECTION HEADER", new_x="LMARGIN", new_y="NEXT")  # snaps to x=10mm
+pdf.set_xy(LEFT, pdf.get_y()); pdf.cell(...)                     # body text at x=22mm
+```
+Headers will sit ~12 mm further left than body text and visually look misaligned, even though both came from `cell()` calls. The fix is one line in `__init__`:
+```python
+self.set_left_margin(LEFT)
+self.set_right_margin(RIGHT)
+```
+Do this BEFORE any rendering. After this, `cell(0, ...)` (full-width) and `new_x="LMARGIN"` both honor your design margins. Body and headers align at the same x.
+
+### 15. Drop caps on chapter openings — easier to skip than to render correctly
+Tempting design touch, but the engineering is fiddly: a 3-line-tall capital placed at the body baseline overlaps subsequent wrapped lines unless you carefully shrink each affected line's `w`. fpdf2 doesn't have a built-in for this; rolling your own breaks on long words at the wrap boundary. **For most books, just don't.** The first paragraph reads fine without one. If a client demands them, render the cap as a separate image and compose the paragraph text around it manually — don't try to share fpdf2's cell flow.
+
+### 16. Cover pages need `set_auto_page_break(False)` while drawing them
+If your cover places elements near the bottom of the page (edition line, studio name footer band), fpdf2's auto page-break can fire mid-cover and spill the last few lines onto a blank page 2. Wrap your `cover_page()` in:
+```python
+pdf.set_auto_page_break(False)
+pdf.add_page()
+# ... draw cover ...
+pdf.set_auto_page_break(True, margin=BOTTOM)
+```
+Otherwise you get a phantom page 2 with one tan rule and the word "FIRST EDITION · 2025" floating at the top.
+
+### 17. Anatomy / labeled diagrams: prompt the labels EXPLICITLY or get them wrong
+Default Gemini image-gen ("a labeled muscle diagram") returns plausible-but-wrong labels — pectoralis on a thigh, sartorius on a forearm. Two paths that work:
+1. **No labels**: prompt "no labels, no text, no annotations" — get a clean unlabeled illustration. Safest.
+2. **Explicit labels with positions**: enumerate each label with a side ("LEFT side of figure: 'Sternocleidomastoid' at neck, 'Pectoralis major' at chest...") and the model places them correctly. Verify visually before shipping. Use `gemini-2.5-flash-image` (cheap) for this — Nano Banana Pro is no more accurate at anatomy than 2.5 Flash, just more expensive.
+
+### 18. Body alignment of section headers — set the same x for headers + paragraphs + bullets
+After fix 14, also make sure your `render_h2` calls `pdf.set_x(LEFT)` explicitly before drawing the header cell. Don't rely on the cursor position from a prior `ln()` — that snaps to LMARGIN, which is now correct, but explicit is safer for future-you when you change margin constants.
+
+### 19. Avoid heavy color blocks on covers if the brand is a "minimalist luxury" aesthetic
+Default cover instinct is to put the title in white text on a dark band at top + bottom. For a Phaidon / Penguin Modern / pravilo-global.com style brand, this looks gimmicky. Better: pure white background, type at top with a thin tan rule beneath, hero image framed in a thin rule, type below. The white space IS the brand.
+
 ---
 
 ## Required environment / dependencies
