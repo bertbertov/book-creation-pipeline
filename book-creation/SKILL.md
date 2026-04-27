@@ -433,7 +433,24 @@ Trap: writing an `add_cream_page()` helper that paints a cream rect on every exp
 
 Either paint EVERY page (override `header()` to fill the page background) or paint NONE (let fpdf2's default white carry it). For premium book aesthetic, **none** wins — pure white throughout.
 
-### 25. Always ship a PUBLISHING_KIT.md per book — don't wait to be asked
+### 25.5. Print/ebook covers MUST be 2:3 portrait — never square
+**Hard rule (Albert, locked 2026-04-27).** Every print/ebook book cover is generated at the same aspect as the PDF title page = **2:3 portrait** (typically 1600×2400 or 1024×1536). NEVER 1:1 square.
+
+The compile script renders the cover as page 1 with `pdf.image(cover, x=0, y=0, w=PAGE_W_MM, h=PAGE_H_MM)` — it stretches whatever you hand it to fit the 6×9 page. Square covers come out distorted (faces squished tall), 9:16 covers come out cramped horizontally.
+
+When generating via Nano Banana Pro, the API's nearest preset is `aspectRatio: "3:4"` (0.75) — generate there and **center-crop** to 2:3 (1600×2400). Verify dimensions before locking:
+```python
+from PIL import Image
+im = Image.open(cover_path)
+w, h = im.size
+assert abs(w/h - 2/3) < 0.005, f"cover must be 2:3, got {w}x{h}"
+```
+
+The audiobook square cover (Findaway/ACX requires 2400×2400) is a SEPARATE file — pad the 2:3 print cover with matching color bands left+right to square it. Don't regenerate.
+
+This bit *The Self-Help Decade* — the original 1024×1024 caricature got stretched on the print PDF. Audiobook square was fine. Different files for different platforms.
+
+### 26. Always ship a PUBLISHING_KIT.md per book — don't wait to be asked
 The book is not "done" until the publishing kit is in the folder alongside the PDF. Required sections:
 - Title block (title, subtitle, author, imprint, edition, language, page count, ISBN plan)
 - Short description (back cover, ~80 words)
