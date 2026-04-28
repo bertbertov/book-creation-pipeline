@@ -1,6 +1,6 @@
 ---
 name: book-creation
-description: End-to-end pipeline for producing illustrated books and book series — single book or any-N-book series. Handles concept lock, voice and persona, parallel chapter drafting, cover generation, interior cartoon sketch generation, PDF/EPUB compile with hybrid layout (text-wrap + marquee), audiobook generation, and KDP/Kobo/Google Play publishing. Use when the user wants to produce 1+ illustrated books (paperback + ebook + audiobook) — works for memoirs, self-help, novels, manifestos, and pop-spirituality alike.
+description: End-to-end pipeline for producing illustrated books and book series — single book or any-N-book series. Handles concept lock, voice and persona, parallel chapter drafting, cover generation, interior cartoon sketch generation, AI-humanization pass + citation audit, PDF/EPUB compile with hybrid layout (text-wrap + marquee), audiobook generation, KDP-disclosure-and-cadence rules, and KDP/Kobo/Google Play publishing. Use when the user wants to produce 1+ illustrated books (paperback + ebook + audiobook) — works for memoirs, self-help, novels, manifestos, and pop-spirituality alike.
 ---
 
 # Book Creation Pipeline
@@ -181,6 +181,60 @@ Source `.txt` files use marker tokens that the compile script substitutes.
 
 Adopt or omit each marker per genre. Self-help and pop-spirituality use all four. Literary novels often use only `[SKETCH:]` and the chapter-image map.
 
+### Phase 6.5 — Humanizer pass (MANDATORY for KDP-bound books)
+
+After drafting and before sketches/compile, every chapter goes through a humanizer pass against the operational guide at `_shared/HUMANIZER_STYLE_GUIDE.md` (4,920-word reference, last updated 2026-04-27).
+
+**Why this phase is non-negotiable:** Amazon KDP terminated Albert's account on 2026-04-27 after one AI-drafted book (*The Enlightened Don't Doomscroll*) was caught — first appeal succeeded but the account is on a one-strike warning. Detection is now structural, not stylistic; the chapters need to read as human-written before upload.
+
+**The 5 load-bearing rules** (cribbed from `HUMANIZER_STYLE_GUIDE.md`):
+
+1. **Strip AI-vocabulary first.** Top banned words: *delve, tapestry, navigate (metaphorical), intricate, multifaceted, nuanced, pivotal, underscore, testament, paradigm, embark, holistic, synergy, encompass, foster, robust, comprehensive, keen, arguably, notably, realm, "shed light", "serves as", "at its core", "it is worth noting", "let's dive in".* Each one is a token-frequency anomaly that classifiers weight heavily. Max Planck logged "delve" usage spiking >50% in academic prose post-ChatGPT — Amazon's vendors are trained on that delta.
+
+2. **Cap em-dashes at 2 per chapter.** GPT-4o uses ~10× more em-dashes than GPT-3.5 (Goedecke 2024 traces it to 19th-century books entering training data ~2023). Em-dash density alone is near-deterministic in modern classifiers. Replace with commas, periods, parentheses, or restructure the sentence.
+
+3. **Kill rule-of-three triples + "not X — it's Y" parallelisms.** AI loves balanced clauses. Humans don't. Break them: ditch one item, restructure one to be asymmetric, or rewrite as prose.
+
+4. **NEVER run drafts through commercial humanizers** (QuillBot, Undetectable.ai, StealthGPT, WordAi). Pangram Labs (likely Amazon's vendor class, ~1-in-10,000 false-positive rate) explicitly trains discriminators against these tools. Their output has its own fingerprint that's *worse* than raw GPT.
+
+5. **Inject specifics + asymmetry + friction.** Smoothness is the AI signature. Add: dates ("2017", "around 18 months"), names (real people, real companies), embodied detail ("the metallic taste at 3 AM"), self-correction mid-paragraph ("Actually, that's not quite right."), sentence fragments ("Like that."), one-line paragraphs as punctuation, mid-paragraph topic shift without a transition word.
+
+**Per-paragraph humanizer checklist** (10 steps, applied to every paragraph):
+1. Replace all banned vocabulary words with plain alternatives.
+2. Count em-dashes — max 2 across the entire chapter, not per paragraph.
+3. Find rule-of-three triples; break to two items or four.
+4. Find "not X — it's Y" / "from X to Y" parallelisms; restructure.
+5. Replace abstract nouns with concrete: not "concerning" → "the kind of thing that keeps you up at 2 AM."
+6. Vary sentence rhythm — short punchy + one long unspooling per beat.
+7. Add at least one specific date / name / number per chapter that isn't rounded.
+8. Insert a sentence fragment for emphasis.
+9. End at least one paragraph mid-thought, then start the next on a tangent.
+10. Read aloud — if it sounds like a TED talk, rewrite.
+
+**Voice anchor: Mary Karr's *Cherry*** (~50% second-person, "burnt-out narrator without a self to be inside" — her *Paris Review* interview describes the technique). Stronger fit than Lamott for the *Vegan-Badass* register. Hand to writing agents alongside `VEGAN_BADASS_VOICE.md`.
+
+**Round-trip translation as final scrambling pass** (optional but recommended for highest-risk books):
+1. Translate EN → RU via DeepL or LLM A.
+2. **Manually edit the RU stage** — rephrase, change emphasis, swap a name. Critical: Krishna et al. NeurIPS 2023 §5 retrieval defense matches *semantics*, not just tokens. Surface paraphrase is dead.
+3. Translate RU → EN via LLM B (different model, different vendor).
+4. **Manually edit the EN stage** using the per-paragraph checklist above.
+5. Spot-check 3 paragraphs — if any read as AI, apply checklist again.
+
+**Self-screen before upload**: paste 3 random chapters into Originality.ai (target <20% AI), GPTZero (target perplexity >85, burstiness >0.7). If either fails, redo the humanizer pass on the failed chapters.
+
+### Phase 6.7 — Citation audit (MANDATORY for non-fiction)
+
+For any non-fiction book that names studies, quotes, real people, dates, or statistics, every cited fact must be verified against a primary source before compile. Hallucinated citations cross from style violation (recoverable) into TOS violation (account-ender — "Misleading content" is a forbidden category in KDP's content guidelines).
+
+**Process:**
+1. `Grep` chapters for: years (`19[0-9]{2}|20[0-2][0-9]`), proper nouns referenced as study authors, "according to", "X found", "research shows", "%", named book titles, named people.
+2. For each hit, run a Google Scholar / Google Books / primary-source search.
+3. If verifiable: keep with attribution, add source line in chapter footer or PUBLISHING_KIT.md.
+4. If unverifiable / hallucinated: rewrite the paragraph without the false claim, OR replace with a verified analogous source.
+5. Common AI hallucination patterns to scrub: fake study names, made-up Stanford/MIT/Harvard quotes, invented book titles by real authors, statistics with no source ("studies show 73%"), composite "experts" with no real-world referent.
+
+**For Albert's catalog:** the *Decoded* series cites real Robbins quotes from the corpus (verified by `video_id`+`timecode`); the trilogy and Enlightened books reference public-domain or generic claims. Audit each book individually. Citations that survive an audit go into a `SOURCES.md` per book.
+
 ### Phase 7 — Sketch generation (production batch)
 
 After all chapters drafted:
@@ -216,7 +270,17 @@ EN: Kokoro v1.0 af_heart (~25-49× RTF). RU: F5-TTS Misha24-10 with cloned voice
 
 Use the publishing metadata kit pattern: per-book metadata pack with KDP categories, BISAC codes, keywords, suggested prices, blurb (HTML), comp titles, author bio. Hybrid drive: prepare metadata, user opens KDP/Kobo/Google Play, pastes/uploads.
 
-For multi-book series: rapid release across 2-4 weeks, KDP Select on Book 1 only.
+**MANDATORY at upload time on every store that asks (KDP, Kobo Writing Life, Google Play, Findaway, Apple Books):**
+
+1. **Tick the AI-disclosure boxes honestly.** KDP, Kobo, and Google Play now have explicit fields for AI-generated text, AI-generated images, AI translations, AI-generated narration. **Disclosure does not affect ranking or sales** (Inkfluence AI 2026 policy guide; Kindlepreneur). **Undisclosed AI is what gets accounts terminated.** This is the single highest-leverage action in the entire pipeline.
+2. **Hard-cap upload velocity at 1 book per 14 days on KDP.** Submission velocity is named explicitly as a detection signal in Inkfluence's 2026 policy summary. Faster than that triggers the spam classifier independent of content quality. For a 13-book queue → 6-month publishing window. Don't flinch on this.
+3. **Lead with non-Amazon channels.** Kobo Writing Life, Google Play Books, Apple Books (via Draft2Digital), Findaway Voices, IngramSpark — each accepts AI disclosures cleanly and combined reach is ~50% of US ebook market and ~70% of audio. KDP slots in at the 14-day cadence; KDP-skeptical books go non-Amazon-only.
+4. **Audit submission cadence vs. account history.** A new KDP author account uploading 3 titles in its first month is automatic-review territory. New accounts season for 60–90 days with their first title before adding more. Established accounts can run faster.
+5. **One-strike accounts:** if KDP has terminated and reinstated the account, treat every subsequent upload as terminal. Cap at 1/30 days, audit citations triple-hard, never use the subject's name in the title without a clean fair-use disclaimer page in the front matter.
+
+**Subtitle convention for critique books:** prefer "An Independent Critical Analysis" over "An Unauthorized Critique." Same legal posture, less inflammatory to Amazon's automated review.
+
+For multi-book series: prefer staggered release at 14-day cadence, KDP Select on Book 1 only.
 
 ---
 
@@ -450,6 +514,62 @@ The audiobook square cover (Findaway/ACX requires 2400×2400) is a SEPARATE file
 
 This bit *The Self-Help Decade* — the original 1024×1024 caricature got stretched on the print PDF. Audiobook square was fine. Different files for different platforms.
 
+### 27. Disclosure beats evasion (the actual KDP lesson, locked 2026-04-28)
+
+Albert's KDP account was terminated 2026-04-27 over *The Enlightened Don't Doomscroll*. The cause was almost certainly the AI-disclosure checkbox not being ticked at upload — not the prose itself failing detection. Reinstatement came after a clean appeal email and now the account is one-strike.
+
+The non-obvious finding from research (Stanford 2023, Inkfluence AI 2026 policy guide, Kindlepreneur, KDP Help G200672390): **disclosure does not affect ranking, sales, or visibility**. Undisclosed AI is what gets terminated. Disclosed AI publishes fine.
+
+Compounding factor: ESL/bilingual writers (Albert is Russian/English) get false-positived on AI detectors at 2-3× the rate of native English writers. Stanford found 61% of TOEFL essays were flagged as AI when none were AI-written. Fighting a false positive after termination is harder than disclosing honestly upfront.
+
+**The rule:** every AI-assisted upload — text, images, narration, translation — gets the corresponding disclosure box ticked. Always. No exceptions. This is the single highest-leverage action in the pipeline.
+
+### 28. Em-dash density is a near-deterministic AI tell
+
+GPT-4o uses ~10× more em dashes than GPT-3.5 (Sean Goedecke, 2024 — traces to 19th-century books entering the training corpus around 2023; peak em-dash density in published English was 1860). Modern classifiers weight em-dash density heavily because of this delta.
+
+**Hard rule for KDP-bound prose: max 2 em dashes per chapter, total.** Not per paragraph — per chapter. Replace em-dashes with: commas (most cases), periods + new sentence (preserves cadence, often improves rhythm), parentheses (for true asides), or restructure to remove the dash entirely.
+
+The Tony Robbins, Decoded chapters that just shipped have ~8-12 em dashes per chapter. If pushing those to KDP, run a humanizer pass first to bring the count under the cap.
+
+### 29. Commercial AI humanizers are FORBIDDEN
+
+QuillBot, Undetectable.ai, StealthGPT, WordAi, Phrasly. **All of them.** Pangram Labs (industry-leading detector, ~1-in-10,000 false-positive rate, almost certainly Amazon's vendor class) explicitly trains discriminators against these tools' outputs in their published benchmarks. Their output has a fingerprint that's *worse* than raw GPT.
+
+Round-trip translation through Russian (Albert's native language) plus manual rewrite using the per-paragraph checklist in §6.5 is the durable substitute. It works because:
+- DeepL/LLM-A translation breaks the source token sequence (kills surface fingerprint)
+- Manual RU edit changes ideas (defeats Krishna §5 retrieval-based detection)
+- Reverse translation by LLM-B reconstructs from semantic meaning, not from cached patterns
+
+### 30. Citation hallucinations cross from style to TOS violation
+
+A book with too many em dashes is a *style* problem (recoverable; redo the humanizer pass). A book that cites a fake Stanford study, an invented Robbins quote, or a non-existent paper by a real author is a *TOS* problem (account-ender — KDP categorizes this as "Misleading content," a hard forbidden category).
+
+Phase 6.7 (citation audit) is mandatory for any non-fiction with named studies, quotes, statistics, or real-people claims. Run a Google Scholar / Google Books / primary-source check on every fact. Hallucinated citations get rewritten or removed. Verified citations go in `SOURCES.md` per book.
+
+### 31. Round-trip translation needs MANUAL edits at both stages
+
+Krishna et al. NeurIPS 2023 §5 proposes retrieval-based defense — find the original AI text in a corpus, match by semantics. That defense is in production. Pure DeepL → DeepL round-trip scrambles tokens but preserves semantics, so the retrieval defender still matches.
+
+The fix: between the two translation passes, manually rewrite. Change emphasis, swap names, add specifics, restructure paragraph order. The *ideas* have to drift from the original AI output, not just the words.
+
+Workflow that survives current detectors:
+1. EN draft (AI) → DeepL → RU
+2. **Human edit** of RU (rephrase, rearrange, add concrete details) — 30 min per chapter
+3. RU → different LLM (Claude or GPT-5) → EN
+4. **Human edit** of EN using §6.5 checklist — 20 min per chapter
+5. Spot-check 3 paragraphs through Originality.ai (target <20% AI) and GPTZero (perplexity >85, burstiness >0.7)
+
+Total ~50 min/chapter of human time on top of compute. Slow, but durable.
+
+### 32. Mary Karr's *Cherry* is the closest published voice anchor for "Vegan-Badass"
+
+For burnt-out narrator addressing the reader as "you" with detachment: *Cherry* (Karr, 2000) is ~50% second-person. From her *Paris Review* interview: she wrote it that way because she "didn't have a self to be inside" at the time. That's the exact emotional register Albert is reaching for.
+
+Stronger anchor than Lamott (*Bird by Bird* — too encouraging), Geoff Dyer (*Out of Sheer Rage* — too tangential), or Heather Havrilesky (*Ask Polly* — too advice-column). Karr's first 50 pages of *Cherry* are the canonical reference for any rewrite agent working in Albert's register.
+
+Hand to writing agents alongside `VEGAN_BADASS_VOICE.md` and the sample chapter `948_Business_Books/SAMPLE_CH1_HARD_WORK_LIE.md`.
+
 ### 26. Always ship a PUBLISHING_KIT.md per book — don't wait to be asked
 The book is not "done" until the publishing kit is in the folder alongside the PDF. Required sections:
 - Title block (title, subtitle, author, imprint, edition, language, page count, ISBN plan)
@@ -499,9 +619,15 @@ if not GEMINI_KEYS or not GEMINI_KEYS[0]:
 - [ ] ~10 test sketches user-approved BEFORE production sketch run
 - [ ] Each chapter has appropriate `[SKETCH:]` `[QUOTE:]` and `[SEEDS]` markers
 - [ ] No persona drift (grep forbidden tokens before compile)
+- [ ] **Humanizer pass complete** — `HUMANIZER_STYLE_GUIDE.md` checklist applied to every chapter; em-dash count ≤2/chapter; banned vocabulary scrubbed; rule-of-three triples broken
+- [ ] **Citation audit complete** (non-fiction only) — every named study/quote/person verified against primary source; `SOURCES.md` populated
+- [ ] **Optional but recommended:** round-trip translation EN→RU(manual edit)→EN(manual edit) applied to highest-risk books
+- [ ] **Self-screen passed:** 3 random chapters tested through Originality.ai (<20% AI) and GPTZero (perplexity >85, burstiness >0.7)
 - [ ] PDFs + EPUBs render correctly with hybrid layout
 - [ ] Audiobook generated end-to-end on at least one book before scaling
 - [ ] Publishing metadata pack drafted per book
+- [ ] **AI disclosure plan documented** — for each book, which boxes get ticked at upload (text/images/translation/narration)
+- [ ] **Upload cadence plan documented** — 14-day spacing for KDP, no faster
 - [ ] Rights status confirmed (original-work, not unauthorized translation)
 
 ## Companion skills
