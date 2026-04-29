@@ -75,33 +75,79 @@ Books/<Project_Name>/
 - Marker conventions (Phase 4)
 - Production checklists
 
-### Phase 2 — Cover generation
+### Phase 2 — Cover generation (CANONICAL Flux + PIL hybrid, locked 2026-04-29)
 
-Best-in-class for legible-text-on-cover: **Google Gemini's Nano Banana Pro** model (`nano-banana-pro-preview`). Best for general scenes with cleaner typography: **Nano Banana Flash** (`gemini-2.5-flash-image`). Local alternative: Flux Krea Dev FP8 via ComfyUI.
+**The pipeline is two stacked layers, never one all-AI render:**
 
-**API keys must be supplied via environment variable** — never hardcoded in the script:
-```bash
-export GEMINI_API_KEYS="key1,key2,key3,key4"   # comma-separated, will be rotated
+#### Layer 1 — Photo via local Flux Krea Dev FP8 on ComfyUI ($0)
+Prompt the SCENE ONLY (setting, figures, lighting). **NO text in the prompt.** All typography is composited later in PIL — letting Flux render text wastes the budget and produces inconsistent typography across re-renders.
+
+Flux workflow params:
+- 1024×1536 portrait (2:3), euler / simple sampler, 28 steps, guidance 4.0
+- ComfyUI endpoint at `http://127.0.0.1:8188`
+- Reference impl: `_gen_covers_enlightened_style.py` in `Books/The_Buddha_Series/02_The_Buddha_at_2_AM/`
+- Cost: $0 / Time: ~60s per take
+
+**Composition rules (so PIL typography can land cleanly):**
+- Upper 40-45% of frame = bright/empty negative space (sky, mist, sand, ocean) for the title block.
+- Figures occupy the lower 55-60% of the frame.
+- "The figure is small in the frame; the environment dominates."
+
+#### Layer 2 — Typography via PIL/Pillow ($0, instant, infinitely tweakable)
+
+**Composite all text + the canonical red bird asset on top of the Flux raw.** Iteration is by editing pixel coordinates and re-running PIL — takes <1s per round-trip.
+
+**The canonical brand header (locked 2026-04-29 — apply to every Albert Kamalov book):**
+```
+            ALBERT [red hummingbird] KAMALOV       ← y=50, 56pt Arial Bold
+                                                     black on bright photo, white on dark
+                                                     (auto-detect via top-band brightness >145)
+
+                  THE BIG TITLE                    ← y=130, 170pt Arial Black
+                  TWO STACKED LINES                  pure black (12,12,14), 165px line leading
+
+                  THE RED SUBTITLE.                ← +25px after title block, 76pt Arial Black
+                  TWO STACKED LINES.                 red (218,49,32), 85px line leading
+
+                  [photo dominates here]
+
+           FROM THE AUTHOR OF THE LAST READER      ← y=h-90, 38pt Arial Bold
+                                                     white with 1px black shadow
 ```
 
-Or per-call:
-```python
-import os
-keys = os.environ["GEMINI_API_KEYS"].split(",")
-```
+**Bird glyph — extracted asset, NEVER re-drawn:**
+- Canonical asset: `C:/Users/A/Desktop/Books/_assets/red_bird.png` (74×76 transparent PNG)
+- Extracted from `Books/The_Enlightened_Series/01_Dont_Hustle/01_Dont_Hustle_Cover_Amazon.jpg` via red-threshold + largest-blob mask
+- On every cover, paste with: `im.paste(bird_resized_to_72px, (x, y), bird_resized_to_72px)` for pixel-perfect brand fidelity
+- Position between names: 28-32px gap each side, vertically aligned with the cap-height of the names
 
-**Cover composition formula** (proven for laid-back self-help series; adapt per genre):
-- Top: AUTHOR NAME in spaced caps with optional logo separator
-- Title: bold hand-drawn-style caps filling upper third (the clickbait headline)
-- Subtitle in accent color (the descriptive promise)
-- Hero subject small in frame, environment dominates
-- Footer: small cap pull-quote (e.g. "FROM THE AUTHOR OF ___")
-- Series cohesion: same recurring visual motif across all covers (a hat, a chair, a window — anything consistent)
+**Reference impl**: `_finalize_bali_cover.py` in `Books/The_Buddha_Series/02_The_Buddha_at_2_AM/` is the canonical PIL composer. Copy and adapt.
 
-**Prompt rules (learned 2026-04-25):**
-- DO NOT ask for "empty white sky-space at the top" → produces flat blown-out band. Let scene fill frame; overlay title on natural shadow.
-- DO put exact text in quotes ("text reads exactly: '…'") — Pro reproduces verbatim.
-- DO say "the entire scene fills the frame to the very top, NO blown-out negative space."
+#### Iteration recipe
+When the user says "tweak X":
+1. Identify which PIL parameter controls X (font size, y-position, color, gap).
+2. Edit the script.
+3. Re-run `python _finalize_*.py` — instant.
+4. Read the updated PNG and show.
+5. Loop.
+
+**NEVER regenerate the Flux photo for a typography tweak** — that wastes 60s, costs nothing but burns time, and changes the underlying scene which the user already approved.
+
+#### When to fall back to Banana Pro
+- User explicitly wants typography photographically embedded INTO the scene (e.g. "as if printed on the wall")
+- User wants the AI to generate weird-stylized glyphs that PIL fonts can't do
+- These are rare. Default to Flux + PIL.
+
+#### Prompt rules for the Flux photo layer (Albert-tested):
+- DO compose for big bright sky at top (40-45% of frame).
+- DO place figures small in the lower 55-60% of the frame.
+- DON'T request "empty white sky-space" — produces flat blown-out band. Ask for "soft pastel sky" / "bright misty sky" / "golden-hour sky."
+- DON'T put text in the Flux prompt. PIL handles all of it.
+
+#### Series cohesion
+Same canonical brand header (ALBERT / bird / KAMALOV) across all covers regardless of book series. Series-specific motifs go into the photo composition (panama-hat man for Enlightened, weathered Buddha for Buddha series, etc.) — never in the typographic header.
+
+**See also**: `~/.claude/projects/c--Users-A--claude/memory/project_book_cover_pipeline.md` (full memory entry with parameter values + iteration history) and `feedback_book_cover_brand_standard.md` (the brand decision).
 
 ### Phase 3 — Sketch art approval gate (mandatory)
 
